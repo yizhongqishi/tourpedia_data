@@ -6,24 +6,24 @@ import requests
 from bs4 import BeautifulSoup as bs
 from urllib import parse, request
 import os
-import numpy as np
 import threading
 
 
-def read_csv(filepath):
+def read_csv(filename):
+    filepath = './csv/' + filename
     result = pd.DataFrame(columns=('id', 'text'))
-    df = pd.read_csv(filepath)
+    df = pd.read_csv(filepath, error_bad_lines=False, low_memory=False)
     for index, row in df.iterrows():
-        print(index)
+        print(filename + ': No.' + str(index))
         url = row[row.last_valid_index()]
         id = url.split('=')[1]
         text = get_text(url)
         dic = {'text': text}
         temp = pd.DataFrame(dic)
-        for index in temp.index:
-            temp.loc[index, 'id'] = id
+        for i in temp.index:
+            temp.loc[i, 'id'] = id
         result = result.append(temp, sort=True)
-    result.to_csv('./test.csv')
+    result.to_csv('./text_output/text-'+filename, index=False)
 
 
 def get_text(url):
@@ -61,25 +61,43 @@ def get_csv(url=None, filename=None):
     request.urlretrieve(url=url, filename=filename)
 
 
-if __name__ == "__main__":
-    # t = get_text('http://tour-pedia.org/api/getReviewsByPlaceId?placeId=114593')
+def get_csv_threading():
+    if not os.path.exists('./csv'):
+        os.mkdir(os.path.join(os.getcwd(), 'csv'))
+    url_table = get_csv_url()
+    # download csv files about place
+    files = []
+    for url in url_table:
+        filepath = './csv/' + os.path.basename(url)
+        files.append(filepath)
+        thread = threading.Thread(target=get_csv, args=(url, filepath,))
+        thread.start()
 
-    # if not os.path.exists('./csv'):
-    #     os.mkdir(os.path.join(os.getcwd(), 'csv'))
-    # url_table = get_csv_url()
-    # threads = []
-    # files = []
-    # # download csv files about place
-    # for url in url_table:
-    #     filepath = './csv/' + os.path.basename(url)
-    #     files.append(filepath)
-    #     thread = threading.Thread(target=get_csv, args=(url, filepath,))
-    #     thread.start()
 
-    # download text from csv files
+def get_result():
+    if not os.path.exists('./text_output'):
+        os.mkdir(os.path.join(os.getcwd(), 'text_output'))
     files = os.listdir('./csv')
-    filepath = files[0]
-    read_csv('./csv/' + filepath)
+    for filename in files:
+        # 多线程
+        thread = threading.Thread(target=read_csv, args=(filename,))
+        thread.start()
+        # 单线程
+        # read_csv(filename)
 
-    # for filepath in files:
-    #     read_csv(filepath)
+
+if __name__ == "__main__":
+    # 下载地点的csv文件，保存在csv文件夹中
+    # get_csv_threading()
+    # 下载review的text，保存在text_output中
+    get_result()
+
+
+    # 原始csv不干净，用来检错来着
+    # df = pd.read_csv('./csv/barcelona-restaurant.csv', error_bad_lines=False)
+    # files = os.listdir('./csv')
+    # for filename in files:
+    #     filepath = './csv/' + filename
+    #     result = pd.DataFrame(columns=('id', 'text'))
+    #     print(filename)
+    #     df = pd.read_csv(filepath, error_bad_lines=False)
